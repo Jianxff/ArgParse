@@ -36,6 +36,7 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <any>
 #include <cstring>
 #include <string>
@@ -379,18 +380,18 @@ class ArgumentParser{
     bool                                _positional_flag = true;    // available flag for adding positional args
     int                                 _positional_num = 0;        // number of positional args
     int                                 _size = 0;                  // size of arguments
+    std::unordered_map<std::string,int> _arg_map_s;                 // mapping short string to pos of argument-structure
+    std::unordered_map<std::string,int> _arg_map_l;                 // mapping long string to pos of argument-structure
     std::vector<Argument>               _args;                      // argument-structure list
 
-    std::map<std::string,int>           _arg_map;                   // mapping string to pos of argument-structure
-
     // filter prefix of '-'
-    std::string _filter(std::string name){
+    int _filter(std::string& name){
         if(name.size() == 0)
-            return "";
+            return -1;
         int p;
         for(p = 0;p < name.length() && name[p] == '-';p++);
-        if(p > 2)  return "";
-        return name.substr(p);
+        name = (p > 2 ? "" : name.substr(p));
+        return p;
     }
 
     // calc prefix of '-'
@@ -409,11 +410,10 @@ class ArgumentParser{
      * @param index 
      * @return Argument* 
      */
-    Argument* _get_argument(std::string index){
-        auto iter = _arg_map.find(index);
-        if(iter == _arg_map.end())
-            return nullptr;
-        return &_args[(*iter).second];
+    Argument* _get_argument(std::string index, bool is_short = true){
+        int pos = is_short ? (_arg_map_s.find(index) == _arg_map_s.end() ? -1 : _arg_map_s[index])
+                           : (_arg_map_l.find(index) == _arg_map_l.end() ? -1 : _arg_map_l[index]);
+        return pos == -1 ? nullptr : &_args[pos];
     }
 
 public:
@@ -445,9 +445,11 @@ public:
         (*new_arg).init<T>();
 
         /* do tag assertion*/
-        std::string tag = _filter(name_or_flag), name = _filter(full_argname);
+        _filter(name_or_flag);
+        _filter(full_argname);
+        std::string tag = name_or_flag, name = full_argname;
         if(tag == "h" || tag == "help")
-            throw Argument::Exception("reserved word");
+            throw Argument::Exception("reserved keyword");
         
         (*new_arg).setTag(tag).setName(name);
 
@@ -463,9 +465,12 @@ public:
         }
         
         /* insert into parser */
-        _arg_map.insert(std::pair<std::string,int>(std::string(tag),_args.size() - 1));
+        if(_arg_map_s.find(tag) != _arg_map_s.end() || _arg_map_l.find(name) != _arg_map_l.end())
+            throw Argument::Exception("duplicated argument");
+            
+        _arg_map_s[tag] = _args.size() - 1;
         if(full_argname.length() > 0)
-            _arg_map.insert(std::pair<std::string,int>(std::string(name),_args.size() - 1));
+            _arg_map_l[name] = _args.size() - 1;
         
         return *new_arg;
     }
@@ -480,8 +485,9 @@ public:
      */
     template<typename T>
     T get_value(const char* index){
-        auto iter = _arg_map.find(index);
-        if(iter == _arg_map.end())  return T();
+        auto iter = _arg_map_s.find(index);
+        if(iter == _arg_map_s.end()) iter = _arg_map_l.find(index);
+        if(iter == _arg_map_s.end() || iter == _arg_map_l.end())  return T();
         return _args[(*iter).second].value<T>();
     }
 
@@ -508,9 +514,10 @@ public:
      */
     template<typename T>
     std::vector<T> get_values(std::string index){
-        auto iter = _arg_map.find(index);
-        if(iter == _arg_map.end())
-            return std::vector<T>();
+        auto iter = _arg_map_s.find(index);
+        if(iter == _arg_map_s.end()) iter = _arg_map_l.find(index);
+        if(iter == _arg_map_s.end() || iter == _arg_map_l.end())  return std::vector<T>();
+            
         return _args[(*iter).second].values<T>();
     }
 
@@ -555,11 +562,15 @@ public:
 
         /* process optional args */
         while(ptr < argc){
-            std::string arg_name_origin(argv[ptr++]);
-            std::string arg_name = _filter(arg_name_origin);
-            auto arg_ptr = _get_argument(arg_name);
+            Argument* arg_ptr = nullptr;
+            std::string arg_name(argv[ptr++]);
+            std::string arg_name_origin = arg_name;
+            int type = _filter(arg_name);
+            if(type == 1 || type == 2){
+                arg_ptr = _get_argument(arg_name, type == 1);
+            }
             if(arg_ptr == nullptr)
-                throw Argument::Exception("unknown argument '" + arg_name + "'");
+                throw Argument::Exception("unknown argument '" + arg_name_origin + "'");
             
             arg_ptr->add_value();
             while(ptr < argc && _argname_assert(std::string(argv[ptr])) == 0){
