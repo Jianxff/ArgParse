@@ -12,7 +12,7 @@ using namespace std;
 int main(int argc, char** argv){
     ArgumentParser parser;
     parser.add_argument<int>("arg1").help("positional argument arg1");
-    parser.add_argument<double>("-arg2","--argument2").choices({0.1,0.2}).help("argument 2 with choices in [0.1,0.2]");
+    parser.add_argument<double>("-arg2","--argument2").choices({0.1,0.2}).default_(0.2).help("argument 2 with choices in [0.1,0.2]");
     parser.add_argument<char>("-arg3","--argument3").default_('A').help("character argument with default value A");
     parser.add_argument<long long>("-arg4","--argument4").required().help("argument but is required");
     parser.add_argument<int>("-arg5","--argument5").nArgs('+').help("argument with multi-params");
