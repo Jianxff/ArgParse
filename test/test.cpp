@@ -28,6 +28,6 @@ int main(int argc, char** argv){
     for(auto it:arg5)
         cout << it << " ";
     cout << endl;
-    cout << parser.get_value<bool>("d") << endl;
+    cout << parser.is_call("d") << endl;
 
 }
