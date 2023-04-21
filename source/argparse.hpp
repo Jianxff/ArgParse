@@ -124,6 +124,7 @@ protected:
   std::string tag() { return _tag;}
   std::string name() { return _name;}
   std::string help() { return _help;}
+  char nargs() { return _n_args == 0 ? '*' : _n_args == 1 ? '?' : '+';}
   bool call_() { return _call;}
   std::set<std::string>& conflicts() { return _conflicts;}
 
@@ -625,12 +626,14 @@ public:
 
     /* optional */
     std::cout << "\noptional arguments:\n";
-    std::cout << "  -h, --help\tshow help message\n";
+    std::cout << " tag  name\tn-args\tnote\n";
+    std::cout << "  -h, --help\t  - \tshow help message\n";
     for(int i = _positional_num; i < _args.size(); i++){
       std::cout << "  -" << _args[i]->tag();
       if(_args[i]->name().length() > 0)
         std::cout << ", --" << _args[i]->name();
       else std::cout << "\t";
+      std::cout << "\t [" << _args[i]->nargs() << "] ";
       std::cout << "\t" << _args[i]->help() << std::endl;
     }
   }
